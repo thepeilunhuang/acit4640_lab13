@@ -2,47 +2,33 @@ provider "aws" {
   region = "us-west-2"
 }
 # create vpc
-resource "aws_vpc" "main" {
-  cidr_block           = "10.0.0.0/16" # vpc ip range
+module "vpc" {
+  source               = "./modules/vpc"
+  cidr_block           = "10.0.0.0/16"
+  vpc_name             = "lab13-vpc"
   enable_dns_hostnames = true
-}
-# create internet gateway to connect to the internet for the vpc
-resource "aws_internet_gateway" "main" {
-  vpc_id = aws_vpc.main.id
-}
-# create route table to route the traffic to the internet gateway
-resource "aws_route_table" "main" {
-  vpc_id = aws_vpc.main.id
+  enable_dns_support   = true
 
-  route {
-    cidr_block = "0.0.0.0/0" # all ip addresses
-    gateway_id = aws_internet_gateway.main.id
+  public_subnets = [
+    {
+      cidr_block        = "10.0.1.0/24"
+      availability_zone = "us-west-2a"
+    }
+  ]
+
+  private_subnets = [
+    {
+      cidr_block        = "10.0.2.0/24"
+      availability_zone = "us-west-2b"
+    }
+  ]
+
+  tags = {
+    Project = "acit4640"
+    Owner   = "Team13"
   }
 }
-# create public subnets
-resource "aws_subnet" "public_subnet" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.1.0/24"
-  availability_zone       = "us-west-2a"
-  map_public_ip_on_launch = true
-}
-# create private subnets
-resource "aws_subnet" "private_subnet" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.2.0/24"
-  availability_zone       = "us-west-2b"
-  map_public_ip_on_launch = true
-}
-# associate the route table to the public subnet
-resource "aws_route_table_association" "public_subnet" {
-  subnet_id      = aws_subnet.public_subnet.id
-  route_table_id = aws_route_table.main.id
-}
-# associate the route table to the private subnet
-resource "aws_route_table_association" "private_subnet" {
-  subnet_id      = aws_subnet.private_subnet.id
-  route_table_id = aws_route_table.main.id
-}
+
 ###################################################
 #### create security group to allow ssh access ########
 module "public_security_group" {
@@ -184,27 +170,25 @@ module "dns" {
 
 ###################################################
 # Configure the terraform backend to store the state file in an S3 bucket
-terraform {
-  backend "s3" {
-    bucket  = "acit-4640-lab13-terraform-state"
-    key     = "lab13/terraform.tfstate" # state file storage path
-    region  = "us-west-2"               # AWS region
-    encrypt = true
+module "terraform_backend" {
+  source        = "./modules/terraform_backend"
+  bucket_name   = "acit-4640-lab13-terraform-state"
+  environment   = "Lab13"
+  force_destroy = true
+  tags = {
+    Project = "acit4640"
+    Owner   = "Team13"
   }
 }
-# create S3 bucket to store the terraform state file
-resource "aws_s3_bucket" "terraform_state" {
-  bucket = "acit-4640-lab13-terraform-state"
-  tags = {
-    Name        = "terraform-state"
-    Environment = "Lab13"
+terraform {
+  backend "s3" {
+    bucket  = module.terraform_backend.bucket_name
+    key     = "lab13/terraform.tfstate" # state file storage path
+    region  = "us-west-2"               # AWS region
+    encrypt = true                      # enable encryption
   }
 }
 
-resource "aws_s3_bucket_acl" "terraform_state_acl" {
-  bucket = aws_s3_bucket.terraform_state.id
-  acl    = "private"
-}
 ###################################################
 # create ssh key pair
 module "ssh_key" {
