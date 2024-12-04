@@ -158,41 +158,26 @@ resource "aws_instance" "b01" {
 
 }
 
-# create dhcp options to allow the instances to use the lab13.internal domain
-resource "aws_vpc_dhcp_options" "main" {
-  domain_name         = "lab13.internal"
+# DNS module
+module "dns" {
+  source              = "./modules/dns"
+  zone_name           = "lab13.internal"
+  vpc_id              = module.vpc.vpc_id
   domain_name_servers = ["AmazonProvidedDNS"]
+  record_ttl          = 300
+
+  instances = [
+    {
+      name       = "w01"
+      private_ip = module.w01.private_ip
+    },
+    {
+      name       = "b01"
+      private_ip = module.b01.private_ip
+    }
+  ]
 }
 
-resource "aws_vpc_dhcp_options_association" "main" {
-  vpc_id          = aws_vpc.main.id
-  dhcp_options_id = aws_vpc_dhcp_options.main.id
-}
-# create route53 zone to allow the instances to use the lab13.internal domain
-resource "aws_route53_zone" "main" {
-  name = "lab13.internal"
-  vpc {
-    vpc_id = aws_vpc.main.id
-  }
-}
-## add DNS records to the route53 zone
-# create a DNS record for the w01 instance
-resource "aws_route53_record" "instance1" {
-  zone_id = aws_route53_zone.main.zone_id
-  name    = "${aws_instance.w01.tags.Name}.lab13.internal"
-  type    = "A"
-  ttl     = "300"
-  records = [aws_instance.w01.private_ip]
-}
-# create a DNS record for the b01 instance
-resource "aws_route53_record" "instance2" {
-  zone_id = aws_route53_zone.main.zone_id
-  name    = "${aws_instance.b01.tags.Name}.lab13.internal"
-  type    = "A"
-  ttl     = "300"
-  records = [aws_instance.b01.private_ip]
-
-}
 ###################################################
 # Configure the terraform backend to store the state file in an S3 bucket
 terraform {
