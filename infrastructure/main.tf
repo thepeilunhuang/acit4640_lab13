@@ -125,37 +125,42 @@ resource "aws_vpc_security_group_ingress_rule" "private_security_group_inside" {
 }
 ###################################################
 # create w01 web and  reverse proxy instances
-resource "aws_instance" "w01" {
+module "w01" {
+  source          = "./modules/ec2"
   ami             = "ami-03839f1dba75bb628"
   instance_type   = "t2.micro"
-  subnet_id       = aws_subnet.public_subnet.id
+  subnet_id       = module.vpc.public_subnet_id
+  security_groups = [module.security_groups.public_security_group]
   key_name        = module.ssh_key.ssh_key_name
-  security_groups = [aws_security_group.public_security_group.id]
-  tags = {
-    Name = "w01"
+  name            = "w01"
+  user_data       = <<-EOF
+                      #!/bin/bash
+                      hostnamectl set-hostname w01
+                    EOF
+  additional_tags = {
+    Server_Role = "web"
+    Project     = "acit4640_lab13"
   }
-  user_data = <<-EOF
-              #!/bin/bash
-              hostnamectl set-hostname w01
-              EOF
 }
 
+
 # create b01 chat backend instance
-resource "aws_instance" "b01" {
+module "b01" {
+  source          = "./modules/ec2"
   ami             = "ami-03839f1dba75bb628"
   instance_type   = "t2.micro"
-  subnet_id       = aws_subnet.private_subnet.id
-  security_groups = [aws_security_group.private_security_group.id]
+  subnet_id       = module.vpc.private_subnet_id
+  security_groups = [module.security_groups.private_security_group]
   key_name        = module.ssh_key.ssh_key_name
-  tags = {
-    Name = "b01"
+  name            = "b01"
+  user_data       = <<-EOF
+                      #!/bin/bash
+                      hostnamectl set-hostname b01
+                    EOF
+  additional_tags = {
+    Server_Role = "backend"
+    Project     = "acit4640_lab13"
   }
-
-  user_data = <<-EOF
-              #!/bin/bash
-              hostnamectl set-hostname b01
-              EOF
-
 }
 
 # DNS module
