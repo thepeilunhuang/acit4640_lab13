@@ -1,0 +1,17 @@
+all:
+  hosts:
+    w01:
+      ansible_host: <W01_PUBLIC_IP>
+      ansible_user: ubuntu
+      ansible_ssh_private_key_file: <PRIVATE_KEY_PATH>
+    b01:
+      ansible_host: <B01_PRIVATE_IP>
+      ansible_user: ubuntu
+      ansible_ssh_private_key_file: <PRIVATE_KEY_PATH>
+  children:
+    web:
+      hosts:
+        w01:
+    backend:
+      hosts:
+        b01:
