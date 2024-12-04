@@ -114,8 +114,8 @@ module "w01" {
   source          = "./modules/ec2"
   ami             = "ami-03839f1dba75bb628"
   instance_type   = "t2.micro"
-  subnet_id       = module.vpc.public_subnet_id
-  security_groups = [module.security_groups.public_security_group]
+  subnet_id       = module.vpc.public_subnet_id[0]
+  security_groups = [module.public_security_group.security_group_id]
   key_name        = module.ssh_key.ssh_key_name
   name            = "w01"
   user_data       = <<-EOF
@@ -135,7 +135,7 @@ module "b01" {
   ami             = "ami-03839f1dba75bb628"
   instance_type   = "t2.micro"
   subnet_id       = module.vpc.private_subnet_id
-  security_groups = [module.security_groups.private_security_group]
+  security_groups = [module.private_security_group.security_group_id]
   key_name        = module.ssh_key.ssh_key_name
   name            = "b01"
   user_data       = <<-EOF
@@ -198,8 +198,11 @@ module "ssh_key" {
 }
 
 module "connect_script" {
-  source           = "git::https://gitlab.com/acit_4640_library/tf_modules/aws_ec2_connection_script.git"
-  ec2_instances    = { "w01" = aws_instance.w01, "b01" = aws_instance.b01 }
+  source = "git::https://gitlab.com/acit_4640_library/tf_modules/aws_ec2_connection_script.git"
+  ec2_instances = {
+    "w01" = module.w01.instance_id,
+    "b01" = module.b01.instance_id
+  }
   output_file_path = "${path.root}/connect_vars.sh"
   ssh_key_file     = module.ssh_key.priv_key_file
   ssh_user_name    = "ubuntu"
