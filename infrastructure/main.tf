@@ -45,84 +45,83 @@ resource "aws_route_table_association" "private_subnet" {
 }
 ###################################################
 #### create security group to allow ssh access ########
-resource "aws_security_group" "public_security_group" {
+module "public_security_group" {
+  source      = "./modules/sg"
   name        = "public_security_group"
-  description = "Allow ssh and http access"
-  vpc_id      = aws_vpc.main.id # connect the security group to the vpc
-}
-# create egress rule to allow all traffic out of the vpc
-resource "aws_vpc_security_group_egress_rule" "public_security_group" {
-  security_group_id = aws_security_group.public_security_group.id
-  ip_protocol       = "-1"
-  cidr_ipv4         = "0.0.0.0/0" # all ip addresses
-  tags = {
-    Name = "main"
+  description = "Allow SSH and HTTP access from the internet and all traffic from VPC"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress_rules = {
+    "ssh_internet" = {
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "Allow SSH from the internet"
+    },
+    "http_internet" = {
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "Allow HTTP from the internet"
+    },
+    "all_vpc" = {
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = [module.vpc.vpc_cidr_block]
+      description = "Allow all traffic from within the VPC"
+    }
+  }
+
+  egress_rules = {
+    "all_out" = {
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "Allow all outbound traffic"
+    }
   }
 }
-# create ingress rule to allow ssh access from the internet
-resource "aws_vpc_security_group_ingress_rule" "public_security_group_outside_ssh" {
-  security_group_id = aws_security_group.public_security_group.id
-  ip_protocol       = "tcp"
-  from_port         = 22
-  to_port           = 22
-  cidr_ipv4         = "0.0.0.0/0" # all ip addresses
-  tags = {
-    Name = "main"
-  }
-}
-# create ingress rule to allow port 80 access from the internet
-resource "aws_vpc_security_group_ingress_rule" "public_security_group_outside_http" {
-  security_group_id = aws_security_group.public_security_group.id
-  ip_protocol       = "tcp"
-  from_port         = 80
-  to_port           = 80
-  cidr_ipv4         = "0.0.0.0/0" # all ip addresses
-}
-# create ingress rule to allow all traffic within the vpc
-resource "aws_vpc_security_group_ingress_rule" "inside" {
-  security_group_id = aws_security_group.main.id
-  ip_protocol       = "-1"
-  cidr_ipv4         = aws_vpc.main.cidr_block # all ip addresses in the vpc
-  tags = {
-    Name = "main"
-  }
-}
+
 ###################################################
 ## create private security group to allow access to the private instances
-resource "aws_security_group" "private_security_group" {
+module "private_security_group" {
+  source      = "./modules/sg"
   name        = "private_security_group"
-  description = "Allow access to the private instances"
-  vpc_id      = aws_vpc.main.id
-}
-# create egress rule to allow all traffic out of the vpc
-resource "aws_vpc_security_group_egress_rule" "private_security_group" {
-  security_group_id = aws_security_group.private_security_group.id
-  ip_protocol       = "-1"
-  cidr_ipv4         = "0.0.0.0/0" # all ip addresses
-  tags = {
-    Name = "main"
+  description = "Allow SSH from the internet and all traffic from VPC"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress_rules = {
+    "ssh_internet" = {
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "Allow SSH from the internet"
+    },
+    "all_vpc" = {
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = [module.vpc.vpc_cidr_block]
+      description = "Allow all traffic from within the VPC"
+    }
+  }
+
+  egress_rules = {
+    "all_out" = {
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "Allow all outbound traffic"
+    }
   }
 }
-# create ingress rule to allow ssh access from the internet
-resource "aws_vpc_security_group_ingress_rule" "private_security_group_outside_ssh" {
-  security_group_id = aws_security_group.private_security_group.id
-  ip_protocol       = "tcp"
-  from_port         = 22
-  to_port           = 22
-  cidr_ipv4         = "0.0.0.0/0" # all ip addresses
-  tags = {
-    Name = "main"
-  }
-}
-# create ingress rule to allow all traffic within the vpc
-resource "aws_vpc_security_group_ingress_rule" "private_security_group_inside" {
-  security_group_id = aws_security_group.main.id
-  ip_protocol       = "-1"
-  cidr_ipv4         = aws_vpc.main.cidr_block # all ip addresses in the vpc
-  tags = {
-    Name = "main"
-  }
-}
+
 ###################################################
 # create w01 web and  reverse proxy instances
 module "w01" {
